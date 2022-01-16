@@ -48,9 +48,12 @@ class Connection : public IServerConnection
     friend class MultiplexedConnections;
 
 public:
-    Connection(const String & host_, UInt16 port_,
+    Connection(
+        const String & host_,
+        UInt16 port_,
         const String & default_database_,
-        const String & user_, const String & password_,
+        const String & user_,
+        const String & password_,
         const String & cluster_,
         const String & cluster_secret_,
         const String & client_name_,
