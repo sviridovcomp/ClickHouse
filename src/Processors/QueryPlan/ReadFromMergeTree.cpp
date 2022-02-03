@@ -26,6 +26,7 @@
 #include <Interpreters/ExpressionAnalyzer.h>
 #include <Interpreters/TreeRewriter.h>
 #include <base/logger_useful.h>
+#include <base/sort.h>
 #include <Common/JSONBuilder.h>
 
 namespace ProfileEvents
@@ -911,6 +912,11 @@ MergeTreeDataSelectAnalysisResultPtr ReadFromMergeTree::selectRangesToRead(
         parts_before_pk = parts.size();
 
         auto reader_settings = getMergeTreeReaderSettings(context);
+
+        bool use_skip_indexes = context->getSettings().use_skip_indexes;
+        if (select.final() && !context->getSettings().use_skip_indexes_if_final)
+            use_skip_indexes = false;
+
         result.parts_with_ranges = MergeTreeDataSelectExecutor::filterPartsByPrimaryKeyAndSkipIndexes(
             std::move(parts),
             metadata_snapshot,
@@ -921,7 +927,7 @@ MergeTreeDataSelectAnalysisResultPtr ReadFromMergeTree::selectRangesToRead(
             log,
             num_streams,
             result.index_stats,
-            context->getSettings().use_skip_indexes);
+            use_skip_indexes);
     }
     catch (...)
     {
@@ -1015,7 +1021,7 @@ void ReadFromMergeTree::initializePipeline(QueryPipelineBuilder & pipeline, cons
         /// Skip this if final was used, because such columns were already added from PK.
         std::vector<String> add_columns = result.sampling.filter_expression->getRequiredColumns().getNames();
         column_names_to_read.insert(column_names_to_read.end(), add_columns.begin(), add_columns.end());
-        std::sort(column_names_to_read.begin(), column_names_to_read.end());
+        ::sort(column_names_to_read.begin(), column_names_to_read.end());
         column_names_to_read.erase(std::unique(column_names_to_read.begin(), column_names_to_read.end()),
                                    column_names_to_read.end());
     }
@@ -1039,7 +1045,7 @@ void ReadFromMergeTree::initializePipeline(QueryPipelineBuilder & pipeline, cons
         if (!data.merging_params.version_column.empty())
             column_names_to_read.push_back(data.merging_params.version_column);
 
-        std::sort(column_names_to_read.begin(), column_names_to_read.end());
+        ::sort(column_names_to_read.begin(), column_names_to_read.end());
         column_names_to_read.erase(std::unique(column_names_to_read.begin(), column_names_to_read.end()), column_names_to_read.end());
 
         pipe = spreadMarkRangesAmongStreamsFinal(
